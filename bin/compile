@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+ROOT_BUILD_DIR=$1
+CACHE_DIR=$2
+ENV_DIR=$3
+
 set -e
 
 function indent() {
@@ -12,18 +16,35 @@ function indent() {
 
 unset GIT_DIR
 
-for BUILDPACK in $(cat $1/.buildpacks); do
+for BUILDPACK in $(cat ${ROOT_BUILD_DIR}/.buildDirectories); do
   dir=$(mktemp -t buildpackXXXXX)
   rm -rf $dir
 
-  url=${BUILDPACK%#*}
-  branch=${BUILDPACK#*#}
+  directory=${BUILDPACK%=*}
+  urlBranch=${BUILDPACK#*=}
+  url=${urlBranch%#*}
+  branch=${urlBranch#*#}
+  cacheDir=${CACHE_DIR}/${directory}
+  buildDir=${ROOT_BUILD_DIR}/${directory}
 
   if [ "$branch" == "$url" ]; then
     branch=""
   fi
 
+  if [ "$directory" == "root" ]; then
+    buildDir=${ROOT_BUILD_DIR}
+  fi
+
+#  echo directory:${directory}
+#  echo url:${url}
+#  echo branch:${branch}
+#  echo cache:${cacheDir}
+#  echo build:${buildDir}
+
+  mkdir -p ${cacheDir}
+
   if [ "$url" != "" ]; then
+    echo "=====> Running buildpack in directory: $directory"
     echo "=====> Downloading Buildpack: $url"
 
     if [[ "$url" =~ \.tgz$ ]]; then
@@ -41,23 +62,24 @@ for BUILDPACK in $(cat $1/.buildpacks); do
     # we'll get errors later if these are needed and don't exist
     chmod -f +x $dir/bin/{detect,compile,release} || true
 
-    framework=$($dir/bin/detect $1)
+    framework=$($dir/bin/detect ${buildDir})
 
     if [ $? == 0 ]; then
       echo "=====> Detected Framework: $framework"
-      $dir/bin/compile $1 $2 $3
+      $dir/bin/compile ${buildDir} ${cacheDir} ${ENV_DIR}
 
       if [ $? != 0 ]; then
         exit 1
       fi
 
       if [ -x $dir/bin/release ]; then
-        $dir/bin/release $1 > $1/last_pack_release.out
+        $dir/bin/release ${buildDir} > ${ROOT_BUILD_DIR}/last_pack_release.out
       fi
     fi
   fi
+  echo
 done
 
-if [ -e $1/last_pack_release.out ]; then
+if [ -e ${ROOT_BUILD_DIR}/last_pack_release.out ]; then
   echo "Using release configuration from last framework ($framework)."
 fi

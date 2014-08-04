@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
-if [ -f $1/.buildpacks ]; then
-  echo "Multipack"
+if [ -f $1/.buildDirectories ]; then
+  echo "DirectoriesPack"
   exit 0
 else
-  echo "no .buildpacks file"
+  echo "no .buildDirectories file"
   exit 1
 fi
